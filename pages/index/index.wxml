@@ -1,0 +1,271 @@
+<view class="container" style="{{themeStyle}}">
+  
+  <view wx:if="{{!hasAuthorized}}" class="auth-page">
+    <view class="title" style="font-size: 24rpx; margin-bottom: 30rpx;">请设置身份</view>
+    <view class="user-setup">
+      <button class="avatar-wrapper" open-type="chooseAvatar" bind:chooseavatar="onChooseAvatar">
+        <image class="avatar" src="{{myAvatar || 'https://xn--ihq8y051bo4fe8p58f8r5b.top/avatars/1.jpg'}}"></image>
+      </button>
+      <input type="nickname" class="weui-input" placeholder="点击输入昵称" bindblur="onInputName"/>
+    </view>
+    <button class="menu-btn" style="margin-top: 20rpx; width: 140rpx !important; height: 46rpx; line-height: 46rpx; font-size: 18rpx;" bindtap="enterGame">进入大厅</button>
+  </view>
+
+  <view wx:elif="{{!isInRoom}}" class="lobby">
+    <view class="title">鬼王作对</view>
+    <view class="btn-group">
+      <button class="menu-btn" style="background: linear-gradient(to bottom, #81c784, #4caf50); color: #fff; box-shadow: 0 4rpx 0 #388e3c, 0 6rpx 6rpx rgba(0,0,0,0.3);" bindtap="createBot">单人匹配 (AI)</button>
+      <button class="menu-btn" bindtap="openCreateModal">创建房间</button>
+      <button class="menu-btn" bindtap="join">加入房间</button>
+    </view>
+  </view>
+
+  <view wx:else class="room">
+    <view class="voice-btn speaker-btn {{speakerOn ? 'on' : 'off'}}" bindtap="toggleSpeaker">🔊</view>
+    <view class="voice-btn mic-btn {{micOn ? 'on recording' : 'off'}}" bindtap="toggleMic">🎤</view>
+
+    <view class="chat-btn" bindtap="toggleChatMenu">💬</view>
+    <view class="chat-mask" wx:if="{{showChatMenu}}" bindtap="toggleChatMenu"></view>
+    <scroll-view class="chat-menu" scroll-y wx:if="{{showChatMenu}}">
+        <block wx:for="{{chatMsgs}}" wx:key="*this">
+            <view class="chat-item" bindtap="sendChat" data-idx="{{index}}">{{item}}</view>
+        </block>
+    </scroll-view>
+
+    <view class="my-chat-bubble" wx:if="{{myChatText}}">{{myChatText}}</view>
+
+    <view class="music-switch" bindtap="openSettings">
+      <text>⚙️</text>
+    </view>
+
+    <view class="settings-mask" wx:if="{{showSettings}}" bindtap="closeSettings"></view>
+    <view class="settings-modal" wx:if="{{showSettings}}">
+      <view class="settings-header">
+        <text class="settings-title">⚙️ 游戏设置</text>
+        <view class="settings-close" bindtap="closeSettings">✖</view>
+      </view>
+      <view class="settings-body">
+        <view class="setting-item">
+          <text>游戏音效</text>
+          <switch checked="{{isSfxOn}}" bindchange="toggleSfx" color="#8c9eff" />
+        </view>
+        <view class="setting-item">
+          <text>游戏音乐</text>
+          <switch checked="{{isBgmOn}}" bindchange="toggleBgm" color="#8c9eff" />
+        </view>
+      </view>
+      <view class="theme-section">
+        <view class="theme-title">背景主题</view>
+        <scroll-view class="theme-scroll" scroll-y="true">
+          <view class="theme-grid">
+            <block wx:for="{{themeOptions}}" wx:key="id">
+              <view class="theme-item {{themeId === item.id ? 'active' : ''}}" bindtap="onSelectTheme" data-id="{{item.id}}">
+                <view class="theme-preview" style="background: {{item.preview}};"></view>
+                <view class="theme-name">{{item.name}}</view>
+              </view>
+            </block>
+          </view>
+        </scroll-view>
+      </view>
+      <view class="settings-footer">
+        <button class="settings-exit-btn" bindtap="doLeave">退出游戏</button>
+      </view>
+    </view>
+
+    <view class="top-bar" wx:if="{{!isBotRoom}}">
+      <view class="fix-room-id">房号: {{roomId}}</view>
+    </view>
+
+    <view class="counter-wrapper" wx:if="{{(status === 'playing' || status === 'doubling') && roomSettings.useCounter}}">
+      <view class="counter-toggle" bindtap="toggleCounter">
+        记牌器 {{showCounter ? '收起 ▲' : '展开 ▼'}}
+      </view>
+      <view class="card-counter" wx:if="{{showCounter && cardCounter.length > 0}}">
+        <block wx:for="{{cardCounter}}" wx:key="disp">
+          <view class="cc-item">
+            <text class="cc-title" style="color: {{item.disp === '大王' ? '#d32f2f' : (item.disp === '小王' ? '#1a1a1a' : '#333')}}">{{item.disp}}</text>
+            <text class="cc-count {{item.count === 0 ? 'zero' : ''}}">{{item.count}}</text>
+          </view>
+        </block>
+      </view>
+    </view>
+
+    <view class="desk">
+      <view class="player-side player-left">
+        <view class="chat-bubble" wx:if="{{leftPlayer.chatText}}">{{leftPlayer.chatText}}</view>
+        <view class="action-tag pos-left" wx:if="{{status==='playing' && leftPlayer.action==='pass'}}">不要</view>
+        <view class="action-tag pos-left" style="color:#ffeb3b;" wx:if="{{status==='doubling' && leftPlayer.hasDoubled}}">{{leftPlayer.isDouble ? '加倍' : '不加倍'}}</view>
+        <view class="avatar-box">
+          <view class="friend-tag" wx:if="{{leftPlayer.isFriend}}">友</view>
+          <image class="avatar-img" src="{{leftPlayer.avatarUrl}}" mode="aspectFill" wx:if="{{leftPlayer.avatarUrl}}"></image>
+          <view class="avatar-emoji" wx:else>👤</view>
+        </view>
+        <view class="name-text">{{leftPlayer.name}}</view>
+        <view style="display:flex; flex-direction:column; align-items:center; gap:2rpx; margin-top:2rpx;">
+          <view style="display:flex; gap:4rpx;">
+            <view class="card-remain" wx:if="{{(status==='playing' || status==='doubling') && leftPlayer.count>0}}">{{leftPlayer.count}}张</view>
+            <view class="card-remain" style="background:#ff9800" wx:if="{{status==='playing' || status==='doubling'}}">{{leftPlayer.score}}分</view>
+          </view>
+          <view class="card-remain" style="background:rgba(0,0,0,0.5);" wx:if="{{status==='playing' || status==='doubling'}}">筹码:{{leftPlayer.beans}}</view>
+        </view>
+      </view>
+
+      <view class="player-side player-top">
+        <view class="chat-bubble" wx:if="{{topPlayer.chatText}}">{{topPlayer.chatText}}</view>
+        <view class="action-tag pos-top" wx:if="{{status==='playing' && topPlayer.action==='pass'}}">不要</view>
+        <view class="action-tag pos-top" style="color:#ffeb3b;" wx:if="{{status==='doubling' && topPlayer.hasDoubled}}">{{topPlayer.isDouble ? '加倍' : '不加倍'}}</view>
+        <view class="avatar-box">
+          <view class="friend-tag" wx:if="{{topPlayer.isFriend}}">友</view>
+          <image class="avatar-img" src="{{topPlayer.avatarUrl}}" mode="aspectFill" wx:if="{{topPlayer.avatarUrl}}"></image>
+          <view class="avatar-emoji" wx:else>👤</view>
+        </view>
+        <view style="display:flex; flex-direction:column; justify-content:center; margin-left:8rpx;">
+          <view class="name-text" style="text-align:left;">{{topPlayer.name}}</view>
+          <view style="display:flex; gap:4rpx; margin-top:2rpx;">
+            <view class="card-remain" wx:if="{{(status==='playing' || status==='doubling') && topPlayer.count>0}}">{{topPlayer.count}}张</view>
+            <view class="card-remain" style="background:#ff9800" wx:if="{{status==='playing' || status==='doubling'}}">{{topPlayer.score}}分</view>
+            <view class="card-remain" style="background:rgba(0,0,0,0.5);" wx:if="{{status==='playing' || status==='doubling'}}">筹码:{{topPlayer.beans}}</view>
+          </view>
+        </view>
+      </view>
+
+      <view class="player-side player-right">
+        <view class="chat-bubble" wx:if="{{rightPlayer.chatText}}">{{rightPlayer.chatText}}</view>
+        <view class="action-tag pos-right" wx:if="{{status==='playing' && rightPlayer.action==='pass'}}">不要</view>
+        <view class="action-tag pos-right" style="color:#ffeb3b;" wx:if="{{status==='doubling' && rightPlayer.hasDoubled}}">{{rightPlayer.isDouble ? '加倍' : '不加倍'}}</view>
+        <view class="avatar-box">
+          <view class="friend-tag" wx:if="{{rightPlayer.isFriend}}">友</view>
+          <image class="avatar-img" src="{{rightPlayer.avatarUrl}}" mode="aspectFill" wx:if="{{rightPlayer.avatarUrl}}"></image>
+          <view class="avatar-emoji" wx:else>👤</view>
+        </view>
+        <view class="name-text">{{rightPlayer.name}}</view>
+        <view style="display:flex; flex-direction:column; align-items:center; gap:2rpx; margin-top:2rpx;">
+          <view style="display:flex; gap:4rpx;">
+            <view class="card-remain" wx:if="{{(status==='playing' || status==='doubling') && rightPlayer.count>0}}">{{rightPlayer.count}}张</view>
+            <view class="card-remain" style="background:#ff9800" wx:if="{{status==='playing' || status==='doubling'}}">{{rightPlayer.score}}分</view>
+          </view>
+          <view class="card-remain" style="background:rgba(0,0,0,0.5);" wx:if="{{status==='playing' || status==='doubling'}}">筹码:{{rightPlayer.beans}}</view>
+        </view>
+      </view>
+    </view>
+
+    <view class="turn-clock pos-bottom" wx:if="{{isMyTurn && status==='playing'}}">{{countdown}}</view>
+    <view class="turn-clock pos-left" wx:if="{{status==='playing' && turn === (myIndex+3)%4}}">{{countdown}}</view>
+    <view class="turn-clock pos-top" wx:if="{{status==='playing' && turn === (myIndex+2)%4}}">{{countdown}}</view>
+    <view class="turn-clock pos-right" wx:if="{{status==='playing' && turn === (myIndex+1)%4}}">{{countdown}}</view>
+
+    <view class="center-area">
+      <view class="msg-tip" wx:if="{{status==='waiting' || status==='doubling'}}">{{msg}}</view>
+    </view>
+
+    <view class="action-tag pos-bottom" wx:if="{{status==='playing' && myAction==='pass'}}">不要</view>
+    <view class="action-tag pos-bottom" style="color:#ffeb3b;" wx:if="{{status==='doubling' && hasDoubled}}">{{myIsDouble ? '加倍' : '不加倍'}}</view>
+
+    <view wx:if="{{playedCards.length > 0}}" class="played-cards-row pos-{{lastPlayPos}}">
+      <block wx:for="{{playedCards}}" wx:key="id">
+        <view class="small-card">
+          <text class="card-num" style="color:{{item.color}}">{{item.display}}</text>
+          <text class="card-suit" style="color:{{item.color}}">{{item.suit}}</text>
+        </view>
+      </block>
+    </view>
+
+    <view class="ops-area" wx:if="{{status === 'waiting'}}">
+        <view class="ops-btn btn-orange" bindtap="doReady" wx:if="{{!isMyReady}}">准备</view>
+        <view class="ops-btn btn-blue" wx:else>已准备</view>
+    </view>
+
+    <view class="ops-area" wx:if="{{status === 'doubling'}}">
+        <block wx:if="{{!hasDoubled}}">
+            <view class="ops-btn btn-blue" bindtap="doNotDouble">不加倍</view>
+            <view class="ops-btn btn-orange" bindtap="doDouble">加倍</view>
+        </block>
+        <block wx:else>
+            <view class="ops-btn btn-blue" style="width:160rpx!important;">等待他人加倍...</view>
+        </block>
+    </view>
+
+    <view class="ops-area" wx:if="{{isMyTurn && status === 'playing'}}">
+        <view class="ops-btn btn-blue" bindtap="doPass" wx:if="{{!isNewRound}}">不出</view>
+        <view class="ops-btn btn-yellow" bindtap="doHint">提示</view>
+        <view class="ops-btn btn-orange" bindtap="doPlay">出牌</view>
+    </view>
+
+    <scroll-view class="hand-area" scroll-x="true" enable-flex="true" wx:if="{{status === 'playing' || status === 'doubling'}}">
+      <view class="hand-inner" bindtouchstart="onHandTouchStart" catchtouchmove="onHandTouchMove" bindtouchend="onHandTouchEnd" bindtouchcancel="onHandTouchEnd">
+        <block wx:for="{{myCards}}" wx:key="id">
+          <view class="my-card {{item.selected ? 'up' : ''}} {{item.isPending ? 'pending' : ''}}" data-i="{{index}}" style="z-index: {{index}}; {{item.is510k ? 'box-shadow: 0 0 10rpx #00e5ff; border-color: #00e5ff;' : ''}}">
+            <text class="card-num" style="color:{{item.color}}">{{item.display}}</text>
+            <text class="card-suit-bottom-left" style="color:{{item.color}}">{{item.suit}}</text>
+            <text class="card-suit-big" style="color:{{item.color}}">{{item.suit}}</text>
+          </view>
+        </block>
+      </view>
+    </scroll-view>
+
+    <view class="bottom-info-bar">
+      <view class="my-chips-area">
+        <image class="my-avatar" src="{{myAvatar || 'https://xn--ihq8y051bo4fe8p58f8r5b.top/avatars/1.jpg'}}"></image>
+        <view class="my-chips">筹码: {{myBeans}}</view>
+      </view>
+      
+      <view class="my-score-center" wx:if="{{status === 'playing' || status === 'doubling'}}">
+        得分: <text style="color:#ffeb3b; font-size:14rpx; padding-left:4rpx;">{{myScore}}</text>
+      </view>
+      <view class="my-score-center" wx:else></view>
+
+      <view class="my-multiplier-area" wx:if="{{status === 'playing' || status === 'doubling'}}">
+        <view class="multi-icon">倍</view>
+        <text class="multi-text">{{currentMultiplier}}</text>
+      </view>
+    </view>
+
+  </view>
+
+  <view class="settings-mask" wx:if="{{showCreateModal}}" bindtap="closeCreateModal"></view>
+  <view class="create-room-modal" wx:if="{{showCreateModal}}">
+    <view class="modal-header">
+      <text class="modal-title">开设房间</text>
+      <text class="modal-subtitle">好友房仅供娱乐，请勿做他用</text>
+      <view class="settings-close" bindtap="closeCreateModal" style="margin-left:auto;">✖</view>
+    </view>
+    <view class="modal-body">
+      <view class="config-row">
+        <text class="row-label">游戏规则</text>
+        <checkbox-group class="row-options" bindchange="onRuleChange">
+          <label><checkbox value="allowDouble" checked="{{roomConfig.allowDouble}}" color="#ffca28"/>允许加倍</label>
+          <label><checkbox value="useCounter" checked="{{roomConfig.useCounter}}" color="#ffca28"/>使用记牌器</label>
+          <label><checkbox value="bombNoDouble" checked="{{roomConfig.bombNoDouble}}" color="#ffca28"/>炸弹不翻倍</label>
+        </checkbox-group>
+      </view>
+      <view class="config-row">
+        <text class="row-label">出牌时长</text>
+        <radio-group class="row-options" bindchange="onTimeChange">
+          <label><radio value="20" checked="{{roomConfig.turnTime == 20}}" color="#ffca28"/>20秒</label>
+          <label><radio value="60" checked="{{roomConfig.turnTime == 60}}" color="#ffca28"/>60秒</label>
+          <label><radio value="99" checked="{{roomConfig.turnTime == 99}}" color="#ffca28"/>99秒</label>
+        </radio-group>
+      </view>
+      <view class="config-row">
+        <text class="row-label">倍数封顶</text>
+        <radio-group class="row-options" bindchange="onCapChange">
+          <label><radio value="768" checked="{{roomConfig.maxCap == '768'}}" color="#ffca28"/>768倍</label>
+          <label><radio value="1536" checked="{{roomConfig.maxCap == '1536'}}" color="#ffca28"/>1536倍</label>
+          <label><radio value="unlimited" checked="{{roomConfig.maxCap == 'unlimited'}}" color="#ffca28"/>无上限</label>
+        </radio-group>
+      </view>
+      <view class="config-row">
+        <text class="row-label">一局轮数</text>
+        <radio-group class="row-options" bindchange="onRoundChange">
+          <label><radio value="3" checked="{{roomConfig.rounds == 3}}" color="#ffca28"/>3局</label>
+          <label><radio value="6" checked="{{roomConfig.rounds == 6}}" color="#ffca28"/>6局</label>
+          <label><radio value="15" checked="{{roomConfig.rounds == 15}}" color="#ffca28"/>15局</label>
+          <label><radio value="24" checked="{{roomConfig.rounds == 24}}" color="#ffca28"/>24局</label>
+        </radio-group>
+      </view>
+    </view>
+    <view class="modal-footer">
+      <button class="confirm-create-btn" bindtap="confirmCreateRoom">开设房间</button>
+    </view>
+  </view>
+</view>

@@ -1,0 +1,12 @@
+{
+  "pages": [
+    "pages/index/index"
+  ],
+  "window": {
+    "pageOrientation": "landscape",
+    "navigationBarTitleText": "爱不会消失",
+    "navigationBarBackgroundColor": "#2e7d32",
+    "navigationBarTextStyle": "white"
+  },
+  "sitemapLocation": "sitemap.json"
+}
