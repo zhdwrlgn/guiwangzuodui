@@ -77,7 +77,6 @@ function detectPlane(uniqueVals, counts, len) {
         const baseLen = runLen * 3;
         if (len < baseLen || len > baseLen + runLen * 2) continue;
 
-        // 主体三连张必须“纯三张”，带牌不能从主体点数里拆出来
         if (run.some(v => counts[v] !== 3)) continue;
 
         const runCount = run.reduce((acc, v) => acc + counts[v], 0);
@@ -209,6 +208,12 @@ function canBeat(lastHand, currHand) {
     if (currHand.type === '510k_mixed' || currHand.type === '510k_pure') return false; 
     return currHand.val > lastHand.val;
   }
+
+  // 🌟 核心修复：允许“三带二”强行管上“三带一”
+  if (lastHand.type === 'trio_solo' && currHand.type === 'trio_two') {
+    return currHand.val > lastHand.val;
+  }
+
   return false;
 }
 
@@ -251,6 +256,12 @@ function findBeatCards(myCards, lastMove, currentSelected = []) {
                for(let c of sorted) {
                  if(c.value !== vals[i]) { possibleHands.push(trio.concat([c])); break; }
                }
+               // 三带二管三带一的提示
+               let others = [];
+               for(let c of sorted) {
+                 if (c.value !== vals[i] && others.length < 2) others.push(c);
+               }
+               if (others.length === 2) possibleHands.push(trio.concat(others));
             }
             else if (lastMove.type === 'trio_two') {
                let others = [];
@@ -350,29 +361,23 @@ function findBeatCards(myCards, lastMove, currentSelected = []) {
 
   if (vals.includes(16) && vals.includes(17)) possibleHands.push(sorted.filter(c => c.value >= 16));
 
-  // 🌟 终极防拆保护：如果手里有 510K，过滤掉所有会破坏它的普通牌提示
   if (has5.length > 0 && has10.length > 0 && hasK.length > 0) {
       possibleHands = possibleHands.filter(hand => {
           let isBomb = hand.length === 4 && hand[0].value === hand[3].value;
           let isRocket = hand.length === 2 && hand[0].value >= 16 && hand[1].value >= 16;
           let is510k = hand.length === 3 && hand.some(c=>c.value===5) && hand.some(c=>c.value===10) && hand.some(c=>c.value===13);
           
-          // 如果要提示的牌本身就是五十K、炸弹、王炸，直接放行
           if (isBomb || isRocket || is510k) return true;
 
-          // 预演：如果把这把牌打出去，剩下的牌里还能不能凑出 510K？
-          let remaining = [...sorted];
-          hand.forEach(hc => {
-              let idx = remaining.findIndex(c => c.id === hc.id);
-              if (idx > -1) remaining.splice(idx, 1);
-          });
+          let pull5 = hand.filter(c => c.value === 5).length;
+          let pull10 = hand.filter(c => c.value === 10).length;
+          let pullK = hand.filter(c => c.value === 13).length;
+
+          let r5 = has5.length - pull5;
+          let r10 = has10.length - pull10;
+          let rK = hasK.length - pullK;
           
-          let r5 = remaining.some(c => c.value === 5);
-          let r10 = remaining.some(c => c.value === 10);
-          let rK = remaining.some(c => c.value === 13);
-          
-          // 如果打出去之后 510K 被拆碎了，那就屏蔽这个提示
-          return r5 && r10 && rK;
+          return r5 > 0 && r10 > 0 && rK > 0;
       });
   }
 

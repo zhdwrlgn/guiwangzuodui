@@ -3,19 +3,20 @@ const suits = ['♠', '♥', '♣', '♦'];
 
 function createDeck() {
   let deck = [];
+  let idCounter = 0;
   // 造牌
   for (let v of cardValues) {
     for (let s of suits) {
       deck.push({
         value: v, display: getDisplay(v), suit: s,
         color: (s === '♥' || s === '♦') ? '#d32f2f' : '#1a1a1a',
-        selected: false, id: s + v + Math.random().toString(36).substr(2)
+        selected: false, id: `C_${idCounter++}`
       });
     }
   }
   // 大小王
-  deck.push({ value: 16, display: '小王', suit: '', color: '#1a1a1a', isJoker: true, selected: false, id: 'BJ' });
-  deck.push({ value: 17, display: '大王', suit: '', color: '#d32f2f', isJoker: true, selected: false, id: 'RJ' });
+  deck.push({ value: 16, display: '小王', suit: '', color: '#1a1a1a', isJoker: true, selected: false, id: `C_${idCounter++}` });
+  deck.push({ value: 17, display: '大王', suit: '', color: '#d32f2f', isJoker: true, selected: false, id: `C_${idCounter++}` });
   return deck;
 }
 
@@ -27,7 +28,7 @@ function getDisplay(v) {
 function getRandomInt(maxExclusive) {
   if (maxExclusive <= 0) return 0;
 
-  // 1) 浏览器/新环境：crypto.getRandomValues
+  // 1) 浏览器 / 新环境：crypto.getRandomValues
   if (typeof globalThis !== 'undefined' && globalThis.crypto && typeof globalThis.crypto.getRandomValues === 'function') {
     const arr = new Uint32Array(1);
     const limit = Math.floor(0x100000000 / maxExclusive) * maxExclusive;

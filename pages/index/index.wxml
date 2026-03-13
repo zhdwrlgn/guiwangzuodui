@@ -1,28 +1,77 @@
 <view class="container" style="{{themeStyle}}">
   
   <view wx:if="{{!hasAuthorized}}" class="auth-page">
-    <view class="title" style="font-size: 24rpx; margin-bottom: 30rpx;">请设置身份</view>
-    <view class="user-setup">
-      <button class="avatar-wrapper" open-type="chooseAvatar" bind:chooseavatar="onChooseAvatar">
-        <image class="avatar" src="{{myAvatar || 'https://xn--ihq8y051bo4fe8p58f8r5b.top/avatars/1.jpg'}}"></image>
-      </button>
-      <input type="nickname" class="weui-input" placeholder="点击输入昵称" bindblur="onInputName"/>
+    <view class="title auth-title">账号登录 / 身份设置</view>
+    <view class="auth-card auth-card-small">
+      <view class="auth-tabs auth-tabs-small">
+        <view class="auth-tab {{authMode === 'login' ? 'active' : ''}}" bindtap="switchAuthMode" data-mode="login">登录</view>
+        <view class="auth-tab {{authMode === 'register' ? 'active' : ''}}" bindtap="switchAuthMode" data-mode="register">注册</view>
+      </view>
+      <view class="user-setup compact auth-compact">
+        <image class="avatar auth-avatar-static" src="{{myAvatar || 'https://xn--ihq8y051bo4fe8p58f8r5b.top/avatars/1.jpg'}}"></image>
+      
+        <scroll-view class="auth-avatar-picker" scroll-x="true" enable-flex="true" show-scrollbar="false">
+          <view class="auth-avatar-list">
+            <block wx:for="{{avatarChoices}}" wx:key="*this">
+              <image
+                class="auth-avatar-item {{(myAvatar === item || myBase64Avatar === item) ? 'active' : ''}}"
+                src="{{item}}"
+                mode="aspectFill"
+                data-url="{{item}}"
+                bindtap="onSelectPresetAvatar"
+              ></image>
+            </block>
+          </view>
+        </scroll-view>
+        <input type="nickname" class="weui-input auth-input-small" placeholder="昵称（用于主页显示）" value="{{myName}}" bindinput="onInputName"/>
+        <input class="weui-input auth-input-small" placeholder="请输入账号" value="{{authUsername}}" bindinput="onAuthUsernameInput"/>
+        <input class="weui-input auth-input-small" password="{{true}}" placeholder="请输入密码" value="{{authPassword}}" bindinput="onAuthPasswordInput"/>
+      </view>
+      <view class="auth-error" wx:if="{{authError}}">{{authError}}</view>
+      <button class="menu-btn auth-submit-btn auth-submit-btn-small" loading="{{authLoading}}" bindtap="submitAuth">{{authMode === 'register' ? '注册并进入' : '登录并进入'}}</button>
     </view>
-    <button class="menu-btn" style="margin-top: 20rpx; width: 140rpx !important; height: 46rpx; line-height: 46rpx; font-size: 18rpx;" bindtap="enterGame">进入大厅</button>
   </view>
 
   <view wx:elif="{{!isInRoom}}" class="lobby">
+    
+    <view class="music-switch" bindtap="backToAuthPage" wx:if="{{hasAuthorized}}">
+      <text>↩</text>
+    </view>
+    <view class="lobby-shop-entry" bindtap="openShop">
+      <text class="lobby-shop-icon">🛍</text>
+      <text class="lobby-shop-text">商城</text>
+    </view>
     <view class="title">鬼王作对</view>
+    <view class="home-profile-card" bindtap="openProfilePanel">
+      <view class="home-profile-left">
+        <image class="home-profile-avatar" src="{{myAvatar || 'https://xn--ihq8y051bo4fe8p58f8r5b.top/avatars/1.jpg'}}"></image>
+        <view class="home-profile-meta">
+          <view class="home-profile-name-row">
+            <text class="home-profile-name">{{myName || '未命名牌手'}}</text>
+            <text class="home-profile-title">{{profileTitle}}</text>
+          </view>
+          <view class="home-profile-id">ID {{profileId}}</view>
+          <view class="home-profile-sign">{{profileSignature}}</view>
+        </view>
+      </view>
+     
+      <view class="home-profile-right">
+        <view class="home-profile-chip">筹码 {{myBeans}}</view>
+        <view class="home-profile-enter">个人主页 ></view>
+      </view>
+    </view>
     <view class="btn-group">
       <button class="menu-btn" style="background: linear-gradient(to bottom, #81c784, #4caf50); color: #fff; box-shadow: 0 4rpx 0 #388e3c, 0 6rpx 6rpx rgba(0,0,0,0.3);" bindtap="createBot">单人匹配 (AI)</button>
-      <button class="menu-btn" bindtap="openCreateModal">创建房间</button>
+      <button class="menu-btn" bindtap="create">创建房间</button>
       <button class="menu-btn" bindtap="join">加入房间</button>
     </view>
   </view>
 
   <view wx:else class="room">
-    <view class="voice-btn speaker-btn {{speakerOn ? 'on' : 'off'}}" bindtap="toggleSpeaker">🔊</view>
-    <view class="voice-btn mic-btn {{micOn ? 'on recording' : 'off'}}" bindtap="toggleMic">🎤</view>
+
+    <view class="round-indicator" wx:if="{{status === 'playing' || status === 'doubling' || status === 'waiting'}}">
+      第 {{roundNo}}/{{roomSettings.rounds || 6}} 局
+    </view>
 
     <view class="chat-btn" bindtap="toggleChatMenu">💬</view>
     <view class="chat-mask" wx:if="{{showChatMenu}}" bindtap="toggleChatMenu"></view>
@@ -49,12 +98,16 @@
           <text>游戏音效</text>
           <switch checked="{{isSfxOn}}" bindchange="toggleSfx" color="#8c9eff" />
         </view>
+        <view class="setting-item setting-exit-inline" bindtap="doLeave">
+          <text>退出</text>
+        </view>
         <view class="setting-item">
           <text>游戏音乐</text>
           <switch checked="{{isBgmOn}}" bindchange="toggleBgm" color="#8c9eff" />
         </view>
       </view>
       <view class="theme-section">
+      
         <view class="theme-title">背景主题</view>
         <scroll-view class="theme-scroll" scroll-y="true">
           <view class="theme-grid">
@@ -67,12 +120,9 @@
           </view>
         </scroll-view>
       </view>
-      <view class="settings-footer">
-        <button class="settings-exit-btn" bindtap="doLeave">退出游戏</button>
-      </view>
     </view>
 
-    <view class="top-bar" wx:if="{{!isBotRoom}}">
+    <view class="top-bar" wx:if="{{!isBotRoom && status === 'waiting'}}">
       <view class="fix-room-id">房号: {{roomId}}</view>
     </view>
 
@@ -83,6 +133,7 @@
       <view class="card-counter" wx:if="{{showCounter && cardCounter.length > 0}}">
         <block wx:for="{{cardCounter}}" wx:key="disp">
           <view class="cc-item">
+        
             <text class="cc-title" style="color: {{item.disp === '大王' ? '#d32f2f' : (item.disp === '小王' ? '#1a1a1a' : '#333')}}">{{item.disp}}</text>
             <text class="cc-count {{item.count === 0 ? 'zero' : ''}}">{{item.count}}</text>
           </view>
@@ -91,16 +142,18 @@
     </view>
 
     <view class="desk">
-      <view class="player-side player-left">
+      <view class="player-side player-left" bindtap="openProfilePanel" data-seat="left">
         <view class="chat-bubble" wx:if="{{leftPlayer.chatText}}">{{leftPlayer.chatText}}</view>
-        <view class="action-tag pos-left" wx:if="{{status==='playing' && leftPlayer.action==='pass'}}">不要</view>
         <view class="action-tag pos-left" style="color:#ffeb3b;" wx:if="{{status==='doubling' && leftPlayer.hasDoubled}}">{{leftPlayer.isDouble ? '加倍' : '不加倍'}}</view>
-        <view class="avatar-box">
+        <view class="avatar-box {{leftPlayer.frameClass}} {{leftPlayer.effectClass}}" bindtap="openProfilePanel" data-seat="left">
           <view class="friend-tag" wx:if="{{leftPlayer.isFriend}}">友</view>
-          <image class="avatar-img" src="{{leftPlayer.avatarUrl}}" mode="aspectFill" wx:if="{{leftPlayer.avatarUrl}}"></image>
+  
+          <view class="disconnect-tag" wx:if="{{leftPlayer.isDisconnected}}">已断开</view>
+          <image class="avatar-img {{leftPlayer.isDisconnected ? 'offline' : ''}}" src="{{leftPlayer.avatarUrl}}" mode="aspectFill" wx:if="{{leftPlayer.avatarUrl}}"></image>
           <view class="avatar-emoji" wx:else>👤</view>
         </view>
         <view class="name-text">{{leftPlayer.name}}</view>
+        <view class="player-equip-text" wx:if="{{leftPlayer.titleText || leftPlayer.badgeText || leftPlayer.effectText}}">{{leftPlayer.titleText}}{{leftPlayer.badgeText ? ' · ' + leftPlayer.badgeText : ''}}{{leftPlayer.effectText ? ' · ' + leftPlayer.effectText : ''}}</view>
         <view style="display:flex; flex-direction:column; align-items:center; gap:2rpx; margin-top:2rpx;">
           <view style="display:flex; gap:4rpx;">
             <view class="card-remain" wx:if="{{(status==='playing' || status==='doubling') && leftPlayer.count>0}}">{{leftPlayer.count}}张</view>
@@ -110,17 +163,18 @@
         </view>
       </view>
 
-      <view class="player-side player-top">
+      <view class="player-side player-top" bindtap="openProfilePanel" data-seat="top">
         <view class="chat-bubble" wx:if="{{topPlayer.chatText}}">{{topPlayer.chatText}}</view>
-        <view class="action-tag pos-top" wx:if="{{status==='playing' && topPlayer.action==='pass'}}">不要</view>
         <view class="action-tag pos-top" style="color:#ffeb3b;" wx:if="{{status==='doubling' && topPlayer.hasDoubled}}">{{topPlayer.isDouble ? '加倍' : '不加倍'}}</view>
-        <view class="avatar-box">
+        <view class="avatar-box {{topPlayer.frameClass}} {{topPlayer.effectClass}}" bindtap="openProfilePanel" data-seat="top">
           <view class="friend-tag" wx:if="{{topPlayer.isFriend}}">友</view>
-          <image class="avatar-img" src="{{topPlayer.avatarUrl}}" mode="aspectFill" wx:if="{{topPlayer.avatarUrl}}"></image>
+          <view class="disconnect-tag" wx:if="{{topPlayer.isDisconnected}}">已断开</view>
+          <image class="avatar-img {{topPlayer.isDisconnected ? 'offline' : ''}}" src="{{topPlayer.avatarUrl}}" mode="aspectFill" wx:if="{{topPlayer.avatarUrl}}"></image>
           <view class="avatar-emoji" wx:else>👤</view>
         </view>
         <view style="display:flex; flex-direction:column; justify-content:center; margin-left:8rpx;">
           <view class="name-text" style="text-align:left;">{{topPlayer.name}}</view>
+          <view class="player-equip-text top" wx:if="{{topPlayer.titleText || topPlayer.badgeText || topPlayer.effectText}}">{{topPlayer.titleText}}{{topPlayer.badgeText ? ' · ' + topPlayer.badgeText : ''}}{{topPlayer.effectText ? ' · ' + topPlayer.effectText : ''}}</view>
           <view style="display:flex; gap:4rpx; margin-top:2rpx;">
             <view class="card-remain" wx:if="{{(status==='playing' || status==='doubling') && topPlayer.count>0}}">{{topPlayer.count}}张</view>
             <view class="card-remain" style="background:#ff9800" wx:if="{{status==='playing' || status==='doubling'}}">{{topPlayer.score}}分</view>
@@ -129,16 +183,18 @@
         </view>
       </view>
 
-      <view class="player-side player-right">
+      <view class="player-side player-right" bindtap="openProfilePanel" data-seat="right">
         <view class="chat-bubble" wx:if="{{rightPlayer.chatText}}">{{rightPlayer.chatText}}</view>
-        <view class="action-tag pos-right" wx:if="{{status==='playing' && rightPlayer.action==='pass'}}">不要</view>
         <view class="action-tag pos-right" style="color:#ffeb3b;" wx:if="{{status==='doubling' && rightPlayer.hasDoubled}}">{{rightPlayer.isDouble ? '加倍' : '不加倍'}}</view>
-        <view class="avatar-box">
+        <view class="avatar-box {{rightPlayer.frameClass}} {{rightPlayer.effectClass}}" bindtap="openProfilePanel" data-seat="right">
           <view class="friend-tag" wx:if="{{rightPlayer.isFriend}}">友</view>
-          <image class="avatar-img" src="{{rightPlayer.avatarUrl}}" mode="aspectFill" wx:if="{{rightPlayer.avatarUrl}}"></image>
+          <view class="disconnect-tag" wx:if="{{rightPlayer.isDisconnected}}">已断开</view>
+ 
+          <image class="avatar-img {{rightPlayer.isDisconnected ? 'offline' : ''}}" src="{{rightPlayer.avatarUrl}}" mode="aspectFill" wx:if="{{rightPlayer.avatarUrl}}"></image>
           <view class="avatar-emoji" wx:else>👤</view>
         </view>
         <view class="name-text">{{rightPlayer.name}}</view>
+        <view class="player-equip-text" wx:if="{{rightPlayer.titleText || rightPlayer.badgeText || rightPlayer.effectText}}">{{rightPlayer.titleText}}{{rightPlayer.badgeText ? ' · ' + rightPlayer.badgeText : ''}}{{rightPlayer.effectText ? ' · ' + rightPlayer.effectText : ''}}</view>
         <view style="display:flex; flex-direction:column; align-items:center; gap:2rpx; margin-top:2rpx;">
           <view style="display:flex; gap:4rpx;">
             <view class="card-remain" wx:if="{{(status==='playing' || status==='doubling') && rightPlayer.count>0}}">{{rightPlayer.count}}张</view>
@@ -158,11 +214,39 @@
       <view class="msg-tip" wx:if="{{status==='waiting' || status==='doubling'}}">{{msg}}</view>
     </view>
 
-    <view class="action-tag pos-bottom" wx:if="{{status==='playing' && myAction==='pass'}}">不要</view>
+    <view class="pass-toast" wx:if="{{status==='playing' && passToastText}}">{{passToastText}}</view>
     <view class="action-tag pos-bottom" style="color:#ffeb3b;" wx:if="{{status==='doubling' && hasDoubled}}">{{myIsDouble ? '加倍' : '不加倍'}}</view>
 
-    <view wx:if="{{playedCards.length > 0}}" class="played-cards-row pos-{{lastPlayPos}}">
-      <block wx:for="{{playedCards}}" wx:key="id">
+    <view wx:if="{{roundPlayed.bottom.length > 0}}" class="played-cards-row pos-bottom">
+      <block wx:for="{{roundPlayed.bottom}}" wx:key="id">
+        <view class="small-card">
+          <text class="card-num" style="color:{{item.color}}">{{item.display}}</text>
+          <text class="card-suit" style="color:{{item.color}}">{{item.suit}}</text>
+          <text class="card-num-bottom-right" style="color:{{item.color}}">{{item.display}}</text>
+        </view>
+      </block>
+    </view>
+
+    <view wx:if="{{roundPlayed.left.length > 0}}" class="played-cards-row pos-left">
+      <block wx:for="{{roundPlayed.left}}" wx:key="id">
+        <view class="small-card">
+          <text class="card-num" style="color:{{item.color}}">{{item.display}}</text>
+          <text class="card-suit" style="color:{{item.color}}">{{item.suit}}</text>
+        </view>
+      </block>
+    </view>
+
+    <view wx:if="{{roundPlayed.top.length > 0}}" class="played-cards-row pos-top">
+      <block wx:for="{{roundPlayed.top}}" wx:key="id">
+        <view class="small-card">
+          <text class="card-num" style="color:{{item.color}}">{{item.display}}</text>
+          <text class="card-suit" style="color:{{item.color}}">{{item.suit}}</text>
+        </view>
+      </block>
+    </view>
+
+    <view wx:if="{{roundPlayed.right.length > 0}}" class="played-cards-row pos-right">
+      <block wx:for="{{roundPlayed.right}}" wx:key="id">
         <view class="small-card">
           <text class="card-num" style="color:{{item.color}}">{{item.display}}</text>
           <text class="card-suit" style="color:{{item.color}}">{{item.suit}}</text>
@@ -205,7 +289,7 @@
 
     <view class="bottom-info-bar">
       <view class="my-chips-area">
-        <image class="my-avatar" src="{{myAvatar || 'https://xn--ihq8y051bo4fe8p58f8r5b.top/avatars/1.jpg'}}"></image>
+        <image class="my-avatar" bindtap="openProfilePanel" src="{{myAvatar || 'https://xn--ihq8y051bo4fe8p58f8r5b.top/avatars/1.jpg'}}"></image>
         <view class="my-chips">筹码: {{myBeans}}</view>
       </view>
       
@@ -220,6 +304,73 @@
       </view>
     </view>
 
+  </view>
+
+  <view class="settings-mask" wx:if="{{showProfilePanel}}" bindtap="closeProfilePanel"></view>
+  <view class="profile-panel" wx:if="{{showProfilePanel}}">
+    <view class="profile-topline"></view>
+    <view class="profile-panel-header">
+      <view>
+      <view class="profile-main-title">个人主页</view>
+      <view class="profile-sub-title">可查看自己或当前房间其他牌手资料</view>
+</view>
+      <view class="settings-close" bindtap="closeProfilePanel">✖</view>
+    </view>
+    <view class="profile-hero-card">
+      <image class="profile-hero-avatar" src="{{profileAvatar || myAvatar || 'https://xn--ihq8y051bo4fe8p58f8r5b.top/avatars/1.jpg'}}"></image>
+      <view class="profile-hero-meta">
+        <view class="profile-name-row">
+          <text class="profile-name">{{profileName || myName || '未命名牌手'}}</text>
+          <text class="profile-rank">{{profileTitle}}</text>
+        </view>
+        <view class="profile-id-text">玩家编号 {{profileId}}</view>
+        <view class="profile-signature">{{profileSignature}}</view>
+        <view class="profile-badge-row">
+          <block wx:for="{{profileBadges}}" wx:key="*this">
+            <view class="profile-badge">{{item}}</view>
+          </block>
+        </view>
+      </view>
+      <view class="profile-chip-box">
+        <text class="profile-chip-label">当前筹码</text>
+        <text class="profile-chip-value">{{profileBeans}}</text>
+      </view>
+    </view>
+    <view class="profile-stats-grid">
+      <view class="profile-stat-card">
+        <text class="profile-stat-value">{{profileStats.totalGames}}</text>
+        <text class="profile-stat-label">总对局</text>
+      </view>
+      <view class="profile-stat-card">
+        <text class="profile-stat-value">{{profileStats.wins}}</text>
+        <text class="profile-stat-label">胜场</text>
+      </view>
+      <view class="profile-stat-card">
+        <text class="profile-stat-value">{{profileStats.winRate}}</text>
+        <text class="profile-stat-label">胜率</text>
+      </view>
+      <view class="profile-stat-card">
+        <text class="profile-stat-value">{{profileStats.highestScore}}</text>
+        <text class="profile-stat-label">最高分</text>
+      </view>
+      <view class="profile-stat-card">
+        <text class="profile-stat-value">{{profileStats.highestBeans}}</text>
+        <text class="profile-stat-label">最高筹码</text>
+      </view>
+      <view class="profile-stat-card">
+        <text class="profile-stat-value">{{profileStats.mvpCount}}</text>
+        <text class="profile-stat-label">MVP</text>
+      </view>
+    </view>
+    <view class="profile-showcase-box">
+      <view class="profile-section-title">牌手档案</view>
+      <block wx:for="{{profileShowcase}}" wx:key="label">
+        <view class="profile-showcase-row">
+          <text class="profile-showcase-label">{{item.label}}</text>
+          <text class="profile-showcase-value">{{item.value}}</text>
+        </view>
+      </block>
+    </view>
   </view>
 
   <view class="settings-mask" wx:if="{{showCreateModal}}" bindtap="closeCreateModal"></view>
@@ -267,5 +418,52 @@
     <view class="modal-footer">
       <button class="confirm-create-btn" bindtap="confirmCreateRoom">开设房间</button>
     </view>
+  </view>
+
+  <view class="settings-mask" wx:if="{{showShopModal}}" bindtap="closeShop"></view>
+  <view class="shop-modal" wx:if="{{showShopModal}}">
+    <view class="shop-header">
+      <view>
+        <view class="shop-title">筹码商城</view>
+        <view class="shop-subtitle">小巧装扮，不改玩法</view>
+      </view>
+      <view class="shop-beans">筹码 {{myBeans}}</view>
+      <view class="shop-close" bindtap="closeShop">✖</view>
+    </view>
+    <view class="shop-tabs">
+      <block wx:for="{{shopTabs}}" wx:key="id">
+        <view class="shop-tab {{shopTab === item.id ? 'active' : ''}}" data-tab="{{item.id}}" bindtap="onShopTabChange">{{item.name}}</view>
+      </block>
+    </view>
+    <scroll-view class="shop-list" scroll-y="true">
+      <block wx:for="{{visibleShopItems}}" wx:key="id">
+        <view class="shop-item">
+          <view class="shop-item-main">
+            <text class="shop-item-icon">{{item.icon}}</text>
+            <view class="shop-item-meta">
+              <view class="shop-item-name">{{item.name}}</view>
+              <view class="shop-item-desc">{{item.desc}}</view>
+            </view>
+          </view>
+          <view class="shop-item-action">
+            <view class="shop-item-price">{{item.price}}筹码</view>
+            <view class="shop-item-btns">
+              <button
+                class="shop-buy-btn {{ownedShopItems.indexOf(item.id) > -1 ? 'owned' : ''}}"
+                data-id="{{item.id}}"
+                bindtap="buyShopItem"
+                disabled="{{ownedShopItems.indexOf(item.id) > -1}}"
+              >{{ownedShopItems.indexOf(item.id) > -1 ? '已拥有' : '购买'}}</button>
+              <button
+                class="shop-equip-btn {{equippedShopItems[item.slot] === item.id ? 'equipped' : ''}}"
+                data-id="{{item.id}}"
+                bindtap="equipShopItem"
+                disabled="{{ownedShopItems.indexOf(item.id) === -1 || equippedShopItems[item.slot] === item.id}}"
+              >{{equippedShopItems[item.slot] === item.id ? '已装备' : '装备'}}</button>
+            </view>
+          </view>
+        </view>
+      </block>
+    </scroll-view>
   </view>
 </view>
